@@ -9,25 +9,17 @@ import metpy
 import metpy.calc as mpcalc
 from metpy.units import units
 
+import subprocess
 import multiprocessing
 from multiprocessing.shared_memory import SharedMemory
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
 
-# Instalar remotes 
-"""ro.r('''
-if (!requireNamespace("remotes", quietly = TRUE)) {
-    install.packages("remotes", repos="https://cloud.r-project.org")
-}
-''')
-
-# Instalar thunder 
-ro.r('''
-if (!requireNamespace("thunder", quietly = TRUE)) {
-    remotes::install_github("bczernecki/thundeR@ML_MU_CAPE")
-}
-''')"""
+subprocess.run(
+    ["Rscript", "install_thunder.R"],
+    check=True
+)
 
 worker_data = {}
 
