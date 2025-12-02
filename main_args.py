@@ -3,9 +3,9 @@ import pandas as pd
 import os
 import argparse
 
-def main(date_init, date_end=False):
+def main(date_init, date_end=None):
     # Fechas a procesar
-    if not date_end:
+    if date_end is None:
         date_end = date_init
     dates = pd.date_range(start=date_init, end=date_end)
 
