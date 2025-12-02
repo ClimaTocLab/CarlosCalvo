@@ -15,11 +15,31 @@ from multiprocessing.shared_memory import SharedMemory
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
+from rpy2.robjects import r
 
-subprocess.run(
-    ["Rscript", "install_thunder.R"],
-    check=True
-)
+
+def install_if_missing(pkg):
+    #Instala un paquete CRAN si no est� instalado
+    utils = importr('utils')
+    installed = ro.r['installed.packages']()
+    if pkg not in installed.rownames:
+        utils.install_packages(pkg, repos="https://cloud.r-project.org")
+
+# 1?? Asegurar remotes
+install_if_missing("remotes")
+remotes = importr("remotes")
+
+# 2?? Instalar thundeR si no existe
+installed_pkgs = ro.r['installed.packages']()
+print("___________________________________")
+print(installed_pkgs)
+print("___________________________________")
+if "thunder" not in installed_pkgs.rownames:
+    ro.r('remotes::install_github("bczernecki/thundeR@ML_MU_CAPE", force=FALSE)')
+
+
+#########################################################################################
+
 
 worker_data = {}
 
