@@ -1,2 +1,7 @@
 venv/
 sounding/
+.vscode
+*.grb
+*.nc
+.RData
+.Rhistory

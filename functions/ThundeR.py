@@ -2,6 +2,7 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 import os
+import sys
 from tqdm import tqdm
 
 import metpy
@@ -13,6 +14,20 @@ from multiprocessing.shared_memory import SharedMemory
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
+
+# Instalar remotes 
+"""ro.r('''
+if (!requireNamespace("remotes", quietly = TRUE)) {
+    install.packages("remotes", repos="https://cloud.r-project.org")
+}
+''')
+
+# Instalar thunder 
+ro.r('''
+if (!requireNamespace("thunder", quietly = TRUE)) {
+    remotes::install_github("bczernecki/thundeR@ML_MU_CAPE")
+}
+''')"""
 
 worker_data = {}
 
@@ -61,18 +76,24 @@ def process_pixel(coords):
     conv_params_r = ro.r['sounding_compute'](pressure=args_r[0], altitude=args_r[1], temp=args_r[2],dpt=args_r[3], wd=args_r[4], ws=args_r[5], accuracy=worker_data['accuracy'])
     conv_params_dict = {key: value for key, value in conv_params_r.items()}
 
+    # Imprimir solo una vez los parametros disponibles
+    if hour == 0 and lat_idx == 0 and lon_idx == 0:
+        #print(">>> Parametros devueltos por thundeR:")
+        #print(list(conv_params_dict.keys()))
+        pass
+
     return hour, lat_idx, lon_idx, conv_params_dict
 
-def main():
+def main(date):
     folder_path = "results"
     os.makedirs(folder_path, exist_ok=True)
 
-    z    = xr.open_dataset('/media/cide/Repository/ERA5/hybrid_level/geop_20230706.nc').z
-    pres = xr.open_dataset('/media/cide/Repository/ERA5/hybrid_level/pres_20230706.nc').pres
-    t    = xr.open_dataset('/media/cide/Repository/ERA5/hybrid_level/ERA5_ml_20230706.nc').t
-    q    = xr.open_dataset('/media/cide/Repository/ERA5/hybrid_level/ERA5_ml_20230706.nc').q
-    u    = xr.open_dataset('/media/cide/Repository/ERA5/hybrid_level/ERA5_ml_20230706.nc').u
-    v    = xr.open_dataset('/media/cide/Repository/ERA5/hybrid_level/ERA5_ml_20230706.nc').v
+    z    = xr.open_dataset(f'data/geop_{date}.nc').z
+    pres = xr.open_dataset(f'data/pres_{date}.nc').pres
+    t    = xr.open_dataset(f'data/ERA5_ml_{date}.nc').t
+    q    = xr.open_dataset(f'data/ERA5_ml_{date}.nc').q
+    u    = xr.open_dataset(f'data/ERA5_ml_{date}.nc').u
+    v    = xr.open_dataset(f'data/ERA5_ml_{date}.nc').v
     dpt = mpcalc.dewpoint_from_specific_humidity(pres.values * units.Pa,t.values * units.K,q.values)
     wdir= (270-np.rad2deg(np.arctan2(u,
                                    v)))%360
@@ -191,6 +212,7 @@ def main():
                    "HGT_ISO_M05"         , "HGT_ISO_M15"         , "HGT_ISO_M20"         ,
                    "HGT_ISO_M25"         , "HGT_ISO_M30"         , "MU5_cold_cloud"      ,
                    "MU5_equal_layer"]
+    
 
     # Spatial and time dimensions
     n_hours = z.sizes["time"]
@@ -210,6 +232,8 @@ def main():
     tasks = [(hour, lat, lon) for hour in range(n_hours) for lat in range(lat_n_rows) for lon in range(lon_n_columns)]
     tiffs_dict = {conv_param: np.zeros((n_hours, lat_n_rows, lon_n_columns)) for conv_param in var_thunder}
 
+
+
     init_args = (pressure_levels_desc, geopotential_height_desc, temperature_desc, dew_point_temperature_desc, wind_direction_desc, wind_speed_desc, var_thunder, accuracy)
 
     with multiprocessing.Pool(processes=multiprocessing.cpu_count(), initializer=init_worker, initargs=init_args) as pool:
@@ -217,6 +241,8 @@ def main():
             hour, lat_idx, lon_idx, conv_params = result
             for conv_param in var_thunder:
                 tiffs_dict[conv_param][hour, lat_idx, lon_idx] = conv_params[conv_param]
+                #tiffs_dict[conv_param][hour, lat_idx, lon_idx] = conv_params.get(conv_param, np.nan)
+
 
     for shared_mem_name, *_ in [pressure_levels_desc, geopotential_height_desc, temperature_desc, dew_point_temperature_desc, wind_direction_desc, wind_speed_desc]:
         shared_mem = SharedMemory(name=shared_mem_name)
@@ -225,7 +251,9 @@ def main():
 
     data_vars = {name: (('time','lat', 'lon'), data) for name, data in tiffs_dict.items()}
     ds_conv_params = xr.Dataset(data_vars=data_vars, coords=z.coords)
-    ds_conv_params.to_netcdf('/media/cide/Repository/ERA5/hybrid_level/TEST_thundeRParams.nc')
+    ds_conv_params.to_netcdf(f'data/thundeRParams_{date}.nc')
+
 
 if __name__ == "__main__":
-    main()
+    date = sys.argv[1]         # ? Recibe el argumento del main
+    main(date)
