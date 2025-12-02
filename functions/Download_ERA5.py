@@ -11,7 +11,7 @@ def Download_ERA5(date):
     # Descargar si no existe
     listdir = os.listdir("data")
     
-    if f"ERA5_ml_{date}.nc" not in listdir or f"ERA5_ml_{date}.grb":
+    if f"ERA5_ml_{date}.nc" not in listdir or f"ERA5_ml_{date}.grb" not in listdir:
         
         os.environ['CDSAPI_RC'] = '/home/workstation08/Escritorio/CarlosCalvo/.cdsapirc'
         c = cdsapi.Client()
